@@ -78,7 +78,6 @@ class modem_readout(data_reduce.data_reduce):
 
         ex_channel = self.readout_channels[ex_channel_name]
         dac_sequence, dac_sequence_adc_time = self.random_alignment_sequence(ex_channel)
-
         sequence = zi_scripts.DMSequence(ex_channel.parent.sequencer_id, self.awg, len(dac_sequence))
         self.awg.set_sequence(ex_channel.parent.sequencer_id, sequence)
         sequence.stop()

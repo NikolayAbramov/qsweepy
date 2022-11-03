@@ -10,7 +10,8 @@ import numpy as np
 
 
 class ZIDevice():
-    def __init__(self, device_id, devtype, config=0, clock=2.40e9, nop=1000, delay_int=4e-6):
+    def __init__(self, device_id, devtype, config=0, clock=2.40e9,
+                 server_host = None , server_port = 8004, nop=1000, delay_int=4e-6):
         """
         Parameters
         ----------
@@ -24,7 +25,9 @@ class ZIDevice():
 
         # Settings
         apilevel_example = 6  # The API level supported by this example.
-        (self.daq, self.device, _) = zhinst.utils.create_api_session(device_id, apilevel_example)
+        (self.daq, self.device, _) = zhinst.utils.create_api_session(device_id, apilevel_example,
+                                                                     server_host = server_host,
+                                                                     server_port = server_port)
         zhinst.utils.api_server_version_check(self.daq)
         self.device_id = device_id
         zhinst.utils.disable_everything(self.daq, self.device)

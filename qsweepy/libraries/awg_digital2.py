@@ -9,7 +9,7 @@ import traceback
 class awg_digital:
     def __init__(self, awg, channel, delay_tolerance=20e-9):#, mixer):
         self.awg = awg
-        self.channel = channel
+        self.channel = channel #
         self.frozen = False
         self.delay = 0  # this value is supposed to be an integer amount of clock cycles!!!
         self.measured_delay = None

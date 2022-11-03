@@ -1,24 +1,15 @@
 from numpy import *
-#from usb_intf import *
-#from reg_intf import *
-
 import warnings
-
-
-#from qsweepy.instrument import Instrument
-#from qsweepy.instrument_drivers.ADS54J40 import *
 from qsweepy.instrument_drivers._ADS54J40.usb_intf import *
 from qsweepy.instrument_drivers._ADS54J40.reg_intf import *
 from qsweepy.instrument_drivers.ADS54J40 import *
-
 import usb.core
 import time
 import sys
 import zlib
+import os
 
-from qsweepy.libraries import config
-
-#sys.path.append('C:\qtlab_replacement\qsweepy\instrument_drivers\_ADS54J40')
+pkg_dir = os.path.dirname(__file__)
 
 class TSW14J56_evm_reducer():
 	def __init__(self, adc):
@@ -155,7 +146,7 @@ class TSW14J56_evm_reducer():
 		self.adc.set_threshold(thresh=1, ncov=feature_id)
 
 class TSW14J56_evm():
-	def __init__(self, fpga_config = True):
+	def __init__(self, fpga_config = True, fpga_firmware = "_ADS54J40/qubit_daq.rbf"):
 		#Number of samples per channel
 		self.nsamp = 65536
 		self.nsegm = 1
@@ -166,8 +157,8 @@ class TSW14J56_evm():
 
 		self.usb_reboot_timeout = 10
 		self.debug_print = False
-		# self.fpga_firmware = "_ADS54J40/qubit_daq.rbf"
-		self.fpga_firmware = config.get_config()['TSW14J56_firmware']
+
+		self.fpga_firmware = pkg_dir+'/'+fpga_firmware
 		self.adc_reducer_hooks = []
 		#self.cov_cnt = 0 ### TODO:what's this??? maybe delete it?
 
@@ -179,7 +170,7 @@ class TSW14J56_evm():
 		else:
 			print ("Programming ADS54J40 ")
 			self.ads.load_lmk_config()
-			time.sleep(5)
+			time.sleep(1)
 			self.ads.load_ads_config()
 			self.ads.device.close()
 
@@ -252,11 +243,13 @@ class TSW14J56_evm():
 			raise ValueError('TSW14J56: FPGA firmware size >0xFFFF bytes not supported!')
 		self.usb_reset()
 		self.dev.ctrl_transfer(vend_req_dir.WR, vend_req.FPGA_CONF_INIT, 0, 0, to_bytes(len(firmware)+2,4) )
+		time.sleep(2)
 		self.dev.write( endpoints.OUT, firmware+bytes([0,0]))
 		res = self.dev.ctrl_transfer(vend_req_dir.RD, vend_req.FPGA_CONF_FIN, 0, 0, 2 )
 		if res[0]==0:
 			raise Exception('TSW14J56: FPGA configuration failed!')
 		self.usb_reset()
+		time.sleep(0.05)
 		checksum = zlib.crc32(firmware)
 		self.write_reg(0x10000, 20, checksum)
 
@@ -285,7 +278,7 @@ class TSW14J56_evm():
 		if(self.debug_print): print( "Read:", hex(Value), hex(Index), hex(data) )
 		return data
 
-	def capture(self, trig = "man", cov = False, fifo = True):
+	def capture(self, trig = "man", fifo = True):
 		'''
 		Function starts data acquisition
 
@@ -298,29 +291,25 @@ class TSW14J56_evm():
 			None
 		'''
 		start = time.time()
-		self.write_reg(CAP_BASE, CAP_SEGM_NUM, int(self.nsegm))
-		if (cov):
-			self.write_reg(CAP_BASE, COV_LEN, int(self.nsamp/8))
-			self.write_reg(CAP_BASE, CAP_LEN, int(self.nsamp/8))
-			#self.cov_cnt = self.cov_cnt + 1
-		else:
-			self.write_reg(CAP_BASE, CAP_LEN, int(self.nsamp/8))
+		self.write_reg(PULSE_PROC_BASE, PULSE_PROC_NSEGM, int(self.nsegm))
+		self.write_reg(PULSE_PROC_BASE, PULSE_PROC_FEATURE_LEN, int(self.nsamp/8))
+		self.write_reg(PULSE_PROC_BASE, PULSE_PROC_CAP_LEN, int(self.nsamp/8))
 		if(trig == "man"):
-			self.write_reg(CAP_BASE, CAP_CTRL, 1<<CAP_CTRL_START |fifo << FIFO_ST )
+			self.write_reg(PULSE_PROC_BASE, PULSE_PROC_CTRL, PULSE_PROC_CTRL_START )
 		elif(trig == "ext"):
-			self.write_reg(CAP_BASE, CAP_CTRL, 1<<CAP_CTRL_START| 1<<CAP_CTRL_EXT_TRIG |cov << COV_ST |fifo << FIFO_ST)
+			self.write_reg(PULSE_PROC_BASE, PULSE_PROC_CTRL, PULSE_PROC_CTRL_START| PULSE_PROC_CTRL_EXT_TRIG_EN )
 		else: return
 
 		t1 = time.time()
 		while(1):
-			if( not( self.read_reg(CAP_BASE, CAP_CTRL) & 1<<CAP_CTRL_BUSY ) ):
+			if( not( self.read_reg(PULSE_PROC_BASE, PULSE_PROC_CTRL) & PULSE_PROC_CTRL_BUSY ) ):
 				break
 			else:
 				if(self.debug_print): print("Busy..")
 
 			if(time.time()-t1>self.timeout):
 				print ("Capture failed")
-				self.write_reg(CAP_BASE, CAP_CTRL, 1 << CAP_CTRL_ABORT)
+				self.write_reg(PULSE_PROC_BASE, PULSE_PROC_CTRL, PULSE_PROC_CTRL_ABORT)
 				break
 		if(self.debug_print): print("Done!")
 

@@ -1,7 +1,8 @@
 import numpy as np
 import ftd2xx
-from qsweepy.libraries import config as global_config
+import os
 
+pkg_dir = os.path.dirname(__file__)
 
 class ADS54J40():
 	def __init__(self):
@@ -50,12 +51,9 @@ class ADS54J40():
 			output.append(0xb8)
 		return(output)
 		
-	def load_lmk_config(self, filename=None):
-		if filename == None:
-			#filename = global_config.get_config()['lmk_config_file']
-			filename = r'D:\qtlab_replacement\qsweepy\qsweepy\instrument_drivers\_ADS54J40\Config_ADC\LMK_100MHz_osc_100MHz_ref_Dpll.cfg'
-		with open(filename, 'rb') as file:
-			config = [[int (i, 16) for i in row.strip().split()[:2]] for row in file if len(row.strip().split())>1]
+	def load_lmk_config(self, filename="_ADS54J40/Config_ADC/LMK_100MHz_osc_100MHz_ref_Dpll.cfg"):
+		file = open(pkg_dir+'/'+filename, 'rb')
+		config = [[int (i, 16) for i in row.strip().split()[:2]] for row in file if len(row.strip().split())>1]
 		r = []
 		for l in config[0:108]:
 			t=self.decode_addr("LMK04828",l[0],l[1])
@@ -72,12 +70,9 @@ class ADS54J40():
 		for i in r:
 			self.write_reg(i)
 			
-	def load_ads_config(self, filename=None):
-		if filename == None:
-			#filename = global_config.get_config()['ads_config_file']
-			filename = r'D:\qtlab_replacement\qsweepy\qsweepy\instrument_drivers\_ADS54J40\Config_ADC\ADS54J40_LMF_8224.cfg'
-		with open(filename, 'rb') as file:
-			config = [[int (i, 16) for i in row.strip().split()[:2]] for row in file if len(row.strip().split())>1]
+	def load_ads_config(self, filename='_ADS54J40/Config_ADC/ADS54J40_LMF_8224.cfg'):
+		file = open(pkg_dir+'/'+filename, 'rb')
+		config = [[int (i, 16) for i in row.strip().split()[:2]] for row in file if len(row.strip().split())>1]
 		x = []
 		for q in config[0:1]:
 			y=self.decode_addr("LMK04828",q[0],q[1])

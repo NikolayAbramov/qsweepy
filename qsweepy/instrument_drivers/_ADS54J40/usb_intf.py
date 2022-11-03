@@ -29,8 +29,8 @@ def to_bytes(number, len, order = '>'):
 		raise ValueError('Order must be "<" or ">"!')
 		
 def mk_val_ind( val32):
-		Value = uint16(uint32(val32)>>16)
-		Index = uint16(uint32(val32)&0xffff)
-		return (Value, Index)		
+	Value = uint16(uint32(val32)>>16)
+	Index = uint16(uint32(val32)&0xffff)
+	return (Value, Index)
 
 uint32odd = dtype(uint32).newbyteorder('>')

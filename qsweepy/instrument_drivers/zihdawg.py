@@ -299,11 +299,19 @@ class ZIDevice2():
 
     #
     def set_clock(self, clock):
+        """
+        Sample clock in Hz
+        """
         self._clock = clock
         self.daq.set([['/' + self.device + '/SYSTEM/CLOCKS/SAMPLECLOCK/FREQ', clock]])
         self.daq.sync()
 
     def set_clock_source(self, source):
+        """
+        0 -internal
+        1 -external
+        2 - ZSync clock
+        """
         self.daq.set([['/' + self.device + '/SYSTEM/CLOCKS/REFERENCECLOCK/SOURCE', source]])
         self.daq.sync()
 
@@ -404,28 +412,40 @@ class ZIDevice2():
         self.daq.sync()
 
     def set_trigger_impedance_1e3(self):
-        # Sets the trigger impedance to 1 kOhm
+        """
+        Sets all trigger inputs impedances to 1 kOhm
+        """
         for trigger_in in range(self.num_channels):
             self.daq.set([['/' + self.device + '/triggers/in/%d/IMP50' % trigger_in, 0]])
             self.daq.sync()
 
     def set_trigger_impedance_50(self):
-        # Sets the trigger impedance to 50 Ohm
+        """
+        Sets all trigger inputs impedances to 1 kOhm
+        """
         for trigger_in in range(self.num_channels):
             self.daq.set([['/' + self.device + '/triggers/in/%d/IMP50' % trigger_in, 1]])
             self.daq.sync()
 
     def set_trig_level(self, input_level):
+        """
+        Set trigger level for all Trig inputs
+            input_level: float
+                Trigger level in Volts. If impedance is 50Ohm, then range is from -5 to 5 V,
+                if 1kOhm, then from -10 to 10 V.
+        """
         for trigger_in in range(self.num_channels):
             self.trig_input_level[trigger_in] = input_level
             self.daq.set([['/' + self.device + '/triggers/in/%d/LEVEL' % trigger_in, input_level]])
             self.daq.sync()
 
-    # Set external trigger channels
-
-    # Allowed Values: 0 - Trigger In 1, 1 - Trigger In 2, 2 - Trigger In 3, 3 - Trigger In 4, 4 - Trigger In 5
-    # 5 - Trigger In 6, 6 - Trigger In 7, 7 - Trigger In 8
     def set_dig_trig1_source(self, sources):  # sourses=self.source_dig_trig_1):
+        """
+        Selects front panel Trig inputs to be Digital Trigger 1 source for all sequencers
+        source: int,array-like
+            A list of Trig connectors indexes [0:num_chan-1].
+            Length must be equal to number of sequencers.
+        """
         if len(sources) != len(self.source_dig_trig_1):
             print('Could not set source for digital trigger 1. Length for sourses array should be equal', self.num_seq)
         else:
@@ -436,6 +456,12 @@ class ZIDevice2():
             self.daq.sync()
 
     def set_dig_trig2_source(self, sources):  # =self.source_dig_trig_2):
+        """
+        Selects front panel Trig inputs to be Digital Trigger 2 source for all sequencers
+        source: int,array-like
+            List of Trig connectors indexes [0:num_chan-1].
+            Length must be equal to number of sequencers.
+        """
         if len(sources) != len(self.source_dig_trig_1):
             print('Could not set source for digital trigger 2. Length for sourses array should be equal', self.num_seq)
         else:
@@ -445,10 +471,17 @@ class ZIDevice2():
                 self.daq.set(exp_settig)
             self.daq.sync()
 
-    # Set external trigger slope
-    # Allowed Values: 0 - Level sensitive trigger, 1 - Rising edge trigger
-    # 2 - Falling edge trigger, 3 - Rising or falling edge trigger
     def set_dig_trig1_slope(self, slope):
+        """
+        Set Digital Trigger 1 slopes for all sequencers
+        slope: int, array-like
+            List of trigger sensitivity modes:
+            0 - Level sensitive;
+            1 - Rising edge;
+            2 - Falling edge;
+            3 - Both edges.
+            Length must be equal to number of sequencers.
+        """
         if len(slope) != len(self.slope_dig_trig_1):
             print('Could not set slope for digital trigger 1. Length for slope array should be equal', self.num_seq)
         else:
@@ -459,6 +492,16 @@ class ZIDevice2():
             self.daq.sync()
 
     def set_dig_trig2_slope(self, slope):
+        """
+        Set Digital Trigger 2 slopes for all sequencers
+        slope: int, array-like
+            List of trigger sensitivity modes:
+            0 - Level sensitive;
+            1 - Rising edge;
+            2 - Falling edge;
+            3 - Both edges.
+            Length must be equal to number of sequencers.
+        """
         if len(slope) != len(self.slope_dig_trig_1):
             print(
                 'Could not set slope for digital trigger 2. Length for slope array should be equal number of sequencers',
@@ -498,6 +541,21 @@ class ZIDevice2():
     # Marker out settings
 
     def set_marker_out(self, source, channel):
+        """
+        Assign a signal to a marker output.
+        source: int
+            Source id:
+            [0:3] - AWG Trigger [1:4], controlled by AWG sequencer commands.
+            4 - Output is assigned to Output 1 Marker 1.
+            5 - Output is assigned to Output 1 Marker 2.
+            6 - Output is assigned to Output 2 Marker 1.
+            7 - Output is assigned to Output 2 Marker 2.
+            [8:15] - Output is assigned to Trigger Input [1:8].
+            17 - Output is set to high
+            18 - Output is set to low
+        channel: int
+            Marker output index [0:num_chan-1]
+        """
         if str(source) in self.mk_out_allowed.keys():
             exp_setting = [['/%s/triggers/out/%d/source' % (self.device, channel), source]]
             self.daq.set(exp_setting)
