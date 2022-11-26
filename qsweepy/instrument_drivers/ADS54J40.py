@@ -51,7 +51,7 @@ class ADS54J40():
 			output.append(0xb8)
 		return(output)
 		
-	def load_lmk_config(self, filename="_ADS54J40/Config_ADC/LMK_100MHz_osc_100MHz_ref_Dpll.cfg"):
+	def load_lmk_config(self, filename="_QubitDAQ/Config_ADC/LMK_100MHz_osc_100MHz_ref_Dpll.cfg"):
 		file = open(pkg_dir+'/'+filename, 'rb')
 		config = [[int (i, 16) for i in row.strip().split()[:2]] for row in file if len(row.strip().split())>1]
 		r = []
@@ -70,7 +70,7 @@ class ADS54J40():
 		for i in r:
 			self.write_reg(i)
 			
-	def load_ads_config(self, filename='_ADS54J40/Config_ADC/ADS54J40_LMF_8224.cfg'):
+	def load_ads_config(self, filename='_QubitDAQ/Config_ADC/ADS54J40_LMF_8224.cfg'):
 		file = open(pkg_dir+'/'+filename, 'rb')
 		config = [[int (i, 16) for i in row.strip().split()[:2]] for row in file if len(row.strip().split())>1]
 		x = []
