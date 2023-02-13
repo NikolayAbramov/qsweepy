@@ -188,7 +188,7 @@ class Device:
 			warnings.warn("QubitDAQ: Unable to read FPGA firmware from file. The device may be unprogrammed!")
 			return
 		checksum = zlib.crc32(firmware_data)
-		if 1:#dev_checksum != checksum:
+		if dev_checksum != checksum:
 			if len(firmware_data) > 0xFFFFFFFF:
 				raise ValueError('QubitDAQ: FPGA firmware size >0xFFFFFFFF bytes not supported!')
 			if len(firmware_data)%4 != 0:
