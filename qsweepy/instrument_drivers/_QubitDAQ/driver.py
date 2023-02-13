@@ -97,7 +97,7 @@ class Device:
 				self.usb_reset()
 				self.fpga_config()
 
-		#self.jesd204_sync()
+		self.jesd204_sync()
 
 	def __del__(self):
 		if self.dev is not None:
@@ -221,13 +221,16 @@ class Device:
 		time.sleep(5)
 		self.ads.load_ads_config()
 		self.ads.device.close()
+		self.jesd204_sync()
 
 	def set_ref_10mhz(self)->None:
 		"""Sets the external reference frequency to 10MHz"""
+		self.ads = ADS54J40()
 		self.ads.load_lmk_config(filename="Config_ADC/LMK_100MHz_osc_10MHz_ref_Dpll.cfg")
 		time.sleep(5)
 		self.ads.load_ads_config()
 		self.ads.device.close()
+		self.jesd204_sync()
 
 	def write_reg(self ,address : int , raw_data: any) -> None:
 		""" Writes data to an FPGA register.
