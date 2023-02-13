@@ -1,17 +1,7 @@
-from numpy import *
-
-import warnings
+import numpy as np
 import os
 
 module_dir = os.path.dirname(os.path.abspath(__file__))
-
-from qsweepy.instrument_drivers._ADS54J40.usb_intf import *
-from qsweepy.instrument_drivers._ADS54J40.reg_intf import *
-from qsweepy.instrument_drivers.ADS54J40 import *
-
-import usb.core
-import time
-import zlib
 
 class TSW14J56_evm_reducer():
 	def __init__(self, adc):
@@ -28,13 +18,15 @@ class TSW14J56_evm_reducer():
 		self.devtype = 'SK'
 		self.result_source = 'avg_cov'
 		self.internal_avg = True
-		#self.avg_cov_mode = 'norm_cmplx' ## normalized results in complex Volts, IQ
+
+		self._numchan = self.adc.get_num_descr_ch()
+		self._nsamp_max = self.adc.get_max_pp_nsamp()
 
 	def set_internal_avg(self, internal_avg):
 		pass
 
 	def get_clock(self):
-		return self.adc.get_clock()
+		return 1e9
 
 	def get_adc_nums(self):
 		return self.adc.nsegm
@@ -48,15 +40,15 @@ class TSW14J56_evm_reducer():
 	def get_points(self):
 		points = {}
 		if self.output_raw:
-			points.update({'Voltage':[('Sample',arange(self.adc.nsegm), ''),
-								 ('Time',arange(self.adc.nsamp)/self.adc.get_clock(), 's')]})
+			points.update({'Voltage': [('Sample', arange(self.adc.nsegm), ''),
+									   ('Time', arange(self.adc.nsamp) / self.get_clock(), 's')]})
 		if self.last_cov:
-			points.update({'last_cov'+str(i):[] for i in range(self.adc.num_covariances)})
+			points.update({'last_cov'+str(i):[] for i in range(self._numchan)})
 		if self.avg_cov:
 			if self.avg_cov_mode == 'real':
-				points.update({'avg_cov'+str(i):[] for i in range(self.adc.num_covariances)})
+				points.update({'avg_cov'+str(i):[] for i in range(self._numchan)})
 			elif self.avg_cov_mode == 'iq':
-				points.update({'avg_cov'+str(i):[] for i in range(self.adc.num_covariances//2)})
+				points.update({'avg_cov'+str(i):[] for i in range(self._numchan//2)})
 		if self.resultnumber:
 			points.update({'resultnumbers':[('State', arange(self.resultnumbers_dimension), '')]})
 		return (points)
@@ -66,12 +58,12 @@ class TSW14J56_evm_reducer():
 		if self.output_raw:
 			dtypes.update({'Voltage':complex})
 		if self.last_cov:
-			dtypes.update({'last_cov'+str(i):float for i in range(self.adc.num_covariances)})
+			dtypes.update({'last_cov'+str(i):float for i in range(self._numchan)})
 		if self.avg_cov:
 			if self.avg_cov_mode == 'real':
-				dtypes.update({'avg_cov'+str(i):float for i in range(self.adc.num_covariances)})
+				dtypes.update({'avg_cov'+str(i):float for i in range(self._numchan)})
 			elif self.avg_cov_mode == 'iq':
-				dtypes.update({'avg_cov'+str(i):complex for i in range(self.adc.num_covariances//2)})
+				dtypes.update({'avg_cov'+str(i):complex for i in range(self._numchan//2)})
 		if self.resultnumber:
 			dtypes.update({'resultnumbers': float})
 		return (dtypes)
@@ -81,68 +73,67 @@ class TSW14J56_evm_reducer():
 		if self.output_raw:
 			opts.update({'Voltage':{'log': None}})
 		if self.last_cov:
-			opts.update({'last_cov'+str(i):{'log': None} for i in range(self.adc.num_covariances)})
+			opts.update({'last_cov'+str(i):{'log': None} for i in range(self._numchan)})
 		if self.avg_cov:
 			if self.avg_cov_mode == 'real':
-				opts.update({'avg_cov'+str(i):{'log': None} for i in range(self.adc.num_covariances)})
+				opts.update({'avg_cov'+str(i):{'log': None} for i in range(self._numchan)})
 			elif self.avg_cov_mode == 'iq':
-				opts.update({'avg_cov'+str(i):{'log': None} for i in range(self.adc.num_covariances//2)})
+				opts.update({'avg_cov'+str(i):{'log': None} for i in range(self._numchan//2)})
 		if self.resultnumber:
 			opts.update({'resultnumbers': {'log': None}})
 		return (opts)
 
 	def measure(self):
 		result = {}
-		if self.avg_cov:
-			avg_before =  {'avg_cov'+str(i):self.adc.get_cov_result_avg(i) for i in range(self.adc.num_covariances)}
-		if self.resultnumber:
-			resultnumbers_before = self.adc.get_resultnumbers()
-		self.adc.capture(trig=self.trig, cov = (self.last_cov or self.avg_cov or self.resultnumber))
+		self.adc.trig_mode = self.trig
+		self.adc.start_wait_done()
+		dot_prods = self.adc.get_dot_prods()
 		if self.output_raw:
 			result.update({'Voltage':self.adc.get_data()})
 		if self.last_cov:
-			result.update({'last_cov'+str(i):self.adc.get_cov_result(i)/self.cov_norms[i] for i in range(self.adc.num_covariances)})
+			result.update({'last_cov'+str(i):dot_prods[-1][i]/self.cov_norms[i] for i in range(self._numchan)})
 		if self.avg_cov:
-			result_raw = {'avg_cov'+str(i):(self.adc.get_cov_result_avg(i)-avg_before['avg_cov'+str(i)])/self.cov_norms[i] for i in range(self.adc.num_covariances)}
+			dot_prods_ave = self.adc.get_dot_prod_ave()
+			result_raw = {'avg_cov'+str(i):dot_prods_ave[i]/self.cov_norms[i] for i in range(self._numchan)}
 			if self.avg_cov_mode == 'real':
 				result.update(result_raw)
 			elif self.avg_cov_mode == 'iq':
 				result.update({'avg_cov0': (result_raw['avg_cov0']+1j*result_raw['avg_cov1']),
 							   'avg_cov1': (result_raw['avg_cov2']+1j*result_raw['avg_cov3'])})
 		if self.resultnumber:
-			result.update({'resultnumbers': [a-b for a,b in zip(self.adc.get_resultnumbers(), resultnumbers_before)][:self.resultnumbers_dimension]})
+			resultnumbers = np.zeros(self.resultnumbers_dimension)
+			states = np.asarray(dot_prods > self.adc.threshold, dtype=int)
+			for s in states:
+				s_int = 0
+				for i in range(self._numchan):
+					s_int |= s[i]<<i
+				resultnumbers[s_int] += 1
+			result.update({'resultnumbers':resultnumbers  })
 
 		return (result)
 
 	def set_feature_iq(self, feature_id, feature):
-		#self.avg_cov_mode = 'norm_cmplx'
-		feature = feature[:self.adc.ram_size]/np.max(np.abs(feature[:self.adc.ram_size]))
-		feature = np.asarray(2**13*feature, dtype=complex)
-		feature_real_int = np.asarray(np.real(feature), dtype=np.int16)
-		feature_imag_int = np.asarray(np.imag(feature), dtype=np.int16)
+		self.adc.set_feature( feature, feature_id*2)
+		self.adc.set_feature( feature.imag-1.j*feature.real, feature_id*2+1)
 
-		self.adc.set_ram_data([feature_real_int.tolist(),     (feature_imag_int).tolist()],  feature_id*2)
-		self.adc.set_ram_data([(feature_imag_int).tolist(),  (-feature_real_int).tolist()], feature_id*2+1)
+		feature = feature[:self._nsamp_max] / np.max(np.abs(feature[:self._nsamp_max]))
+		feature = np.asarray(2 ** 13 * feature, dtype=complex)
 
 		self.cov_norms[feature_id*2] = np.sqrt(np.mean(np.abs(feature)**2))*2**13
 		self.cov_norms[feature_id*2+1] = np.sqrt(np.mean(np.abs(feature)**2))*2**13
 
 	def set_feature_real(self, feature_id, feature, threshold=None):
-		#self.avg_cov_mode = 'norm_cmplx'
 		if threshold is not None:
-			threshold = threshold/np.max(np.abs(feature[:self.adc.ram_size]))*(2**13)
-			self.adc.set_threshold(thresh=threshold, ncov=feature_id)
+			threshold = threshold/np.max(np.abs(feature[:self._nsamp_max]))*(2**13)
+			self.adc.set_threshold(threshold, feature_id)
 
-		feature = feature[:self.adc.ram_size]/np.max(np.abs(feature[:self.adc.ram_size]))
-		feature_padded = np.zeros(self.adc.ram_size, dtype=np.complex)
-		feature_padded[:len(feature)] = feature
-		feature = np.asarray(2**13*feature_padded, dtype=complex)
-		feature_real_int = np.asarray(np.real(feature), dtype=np.int16)
-		feature_imag_int = np.asarray(np.imag(feature), dtype=np.int16)
+		self.adc.set_feature(feature, feature_id)
 
-		self.adc.set_ram_data([feature_real_int.tolist(),    (feature_imag_int).tolist()],  feature_id)
+		feature = feature[:self._nsamp_max] / np.max(np.abs(feature[:self._nsamp_max]))
+		feature = np.asarray(2 ** 13 * feature, dtype=complex)
+
 		self.cov_norms[feature_id] = np.sqrt(np.mean(np.abs(feature)**2))*2**13
 
 	def disable_feature(self, feature_id):
-		self.adc.set_ram_data([np.zeros(self.adc.ram_size, dtype=np.int16).tolist(), np.zeros(self.adc.ram_size, dtype=np.int16).tolist()], feature_id)
-		self.adc.set_threshold(thresh=1, ncov=feature_id)
+		self.adc.set_feature( np.zeros(self._nsamp_max), feature_id)
+		self.adc.set_threshold(1, feature_id)
